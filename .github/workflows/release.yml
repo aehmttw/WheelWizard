@@ -115,54 +115,54 @@ jobs:
         env:
           BUILD_ARCH: arm64
 
-      - name: Import signing certificate
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-        run: |
-          # Write the certificate from the secret
-          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+      # - name: Import signing certificate
+      #   env:
+      #     MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      #     MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      #   run: |
+      #     # Write the certificate from the secret
+      #     echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
 
-          # Create a temporary keychain
-          security create-keychain -p temp build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p temp build.keychain
+      #     # Create a temporary keychain
+      #     security create-keychain -p temp build.keychain
+      #     security default-keychain -s build.keychain
+      #     security unlock-keychain -p temp build.keychain
 
-          # Import the certificate
-          security import certificate.p12 -k build.keychain \
-            -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+      #     # Import the certificate
+      #     security import certificate.p12 -k build.keychain \
+      #       -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
 
-          # Allow codesign to access the keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp build.keychain
+      #     # Allow codesign to access the keychain
+      #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp build.keychain
 
-          # Verify the import
-          echo "[INFO] Available signing identities:"
-          security find-identity -v -p basic
-          rm certificate.p12
+      #     # Verify the import
+      #     echo "[INFO] Available signing identities:"
+      #     security find-identity -v -p basic
+      #     rm certificate.p12
 
-      - name: Sign the .app bundle with Developer ID
-        run: |
-          ENTITLEMENTS="${{ github.workspace }}/macos/certs/WheelWizardEntitlements.entitlements"
-          APP_PATH="release/WheelWizard.app"
-          SIGNING_IDENTITY="Developer ID Application: Gabriel Magaña (Z4D7MUNZ97)"
+      # - name: Sign the .app bundle with Developer ID
+      #   run: |
+      #     ENTITLEMENTS="${{ github.workspace }}/macos/certs/WheelWizardEntitlements.entitlements"
+      #     APP_PATH="release/WheelWizard.app"
+      #     SIGNING_IDENTITY="Developer ID Application: Gabriel Magaña (Z4D7MUNZ97)"
 
-          # List available identities for debugging
-          echo "[INFO] Checking signing identities..."
-          security find-identity -v -p codesigning
+      #     # List available identities for debugging
+      #     echo "[INFO] Checking signing identities..."
+      #     security find-identity -v -p codesigning
 
-          # Sign all executables inside the bundle first
-          find "$APP_PATH/Contents/MacOS" -type f | while read fname; do
-            echo "[INFO] Signing $fname"
-            codesign --force --timestamp --options=runtime \
-              --entitlements "$ENTITLEMENTS" \
-              --sign "$SIGNING_IDENTITY" "$fname"
-          done
+      #     # Sign all executables inside the bundle first
+      #     find "$APP_PATH/Contents/MacOS" -type f | while read fname; do
+      #       echo "[INFO] Signing $fname"
+      #       codesign --force --timestamp --options=runtime \
+      #         --entitlements "$ENTITLEMENTS" \
+      #         --sign "$SIGNING_IDENTITY" "$fname"
+      #     done
 
-          # Sign the .app bundle itself
-          echo "[INFO] Signing .app bundle"
-          codesign --force --timestamp --options=runtime \
-            --entitlements "$ENTITLEMENTS" \
-            --sign "$SIGNING_IDENTITY" "$APP_PATH"
+      #     # Sign the .app bundle itself
+      #     echo "[INFO] Signing .app bundle"
+      #     codesign --force --timestamp --options=runtime \
+      #       --entitlements "$ENTITLEMENTS" \
+      #       --sign "$SIGNING_IDENTITY" "$APP_PATH"
 
       - name: Create DMG
         id: create-dmg
@@ -176,36 +176,36 @@ jobs:
           icon_position: 200 150
           app_drop_link: 450 150
 
-      - name: Notarize and staple the .app
-        env:
-          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
-          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
-          MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
-        run: |
-          # Notarize the .app bundle
-          ditto -c -k --sequesterRsrc --keepParent \
-            release/WheelWizard.app \
-            WheelWizard-app-notarize.zip
-          xcrun notarytool submit WheelWizard-app-notarize.zip \
-            --apple-id "$MACOS_NOTARY_APPLE_ID" \
-            --team-id "$MACOS_NOTARY_TEAM_ID" \
-            --password "$MACOS_NOTARY_APP_PASSWORD" \
-            --wait
-          rm WheelWizard-app-notarize.zip
-          xcrun stapler staple release/WheelWizard.app
+      # - name: Notarize and staple the .app
+      #   env:
+      #     MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+      #     MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+      #     MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+      #   run: |
+      #     # Notarize the .app bundle
+      #     ditto -c -k --sequesterRsrc --keepParent \
+      #       release/WheelWizard.app \
+      #       WheelWizard-app-notarize.zip
+      #     xcrun notarytool submit WheelWizard-app-notarize.zip \
+      #       --apple-id "$MACOS_NOTARY_APPLE_ID" \
+      #       --team-id "$MACOS_NOTARY_TEAM_ID" \
+      #       --password "$MACOS_NOTARY_APP_PASSWORD" \
+      #       --wait
+      #     rm WheelWizard-app-notarize.zip
+      #     xcrun stapler staple release/WheelWizard.app
 
-      - name: Notarize the DMG
-        env:
-          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
-          MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
-          MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
-        run: |
-          xcrun notarytool submit WheelWizard-macOSarm64.dmg \
-            --apple-id "$MACOS_NOTARY_APPLE_ID" \
-            --team-id "$MACOS_NOTARY_TEAM_ID" \
-            --password "$MACOS_NOTARY_APP_PASSWORD" \
-            --wait
-          xcrun stapler staple WheelWizard-macOSarm64.dmg
+      # - name: Notarize the DMG
+      #   env:
+      #     MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+      #     MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+      #     MACOS_NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+      #   run: |
+      #     xcrun notarytool submit WheelWizard-macOSarm64.dmg \
+      #       --apple-id "$MACOS_NOTARY_APPLE_ID" \
+      #       --team-id "$MACOS_NOTARY_TEAM_ID" \
+      #       --password "$MACOS_NOTARY_APP_PASSWORD" \
+      #       --wait
+      #     xcrun stapler staple WheelWizard-macOSarm64.dmg
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
